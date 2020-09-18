@@ -13,8 +13,8 @@ rolls = game.roll()
 
 nums = list(filter(lambda x: isinstance(x, int), rolls))
 ops = list(filter(lambda x: isinstance(x, str), rolls))
-nums = [2, 2, 3, 5, 8, 9]
-ops = ['+', '-', '*', '^', 'v']
+nums = [1, 2, 2, 3, 4, 5, 8, 9]
+ops = ['+', '-', '-', '*', '^', 'v']
 goal = nums[random.randint(0, len(nums) - 1)]
 nums.remove(goal)
 # nums = sorted([1, 1, 0, 2, 2])
@@ -49,10 +49,6 @@ def generate_pairs(state, nums, ops):
             nums_used = state['nums_used'] + [nu]
             eval_expr = state['eval'] + [ops[op], str(nums[nu])]
             repr = state['repr'] + [ops[op], str(nums[nu])]
-            # if ops[op] == '√':
-            #     eval_expr = state['eval'] + ['**root**', str(nums[nu])]
-            # if ops[op] == '^':
-            #     eval_expr = state['eval'] + ['**', str(nums[nu])]
             temp_states += [{'eval': eval_expr, 'repr': repr,
                              'nums_used': nums_used, 'ops_used': ops_used}]
     return temp_states
@@ -68,7 +64,7 @@ clib = ctypes.CDLL(libname)
 
 class RESULT(ctypes.Structure):
     _fields_ = [("ret", ctypes.c_int),
-                ("val", ctypes.c_double),
+                ("val", ctypes.c_longdouble),
                 ("msg", ctypes.c_char_p)]
 
 
@@ -142,7 +138,7 @@ def check_states(states, equations, reprs, checked, invalid):
 parens_time = []
 
 
-def generate_parens(state, open_pos, close_pos):
+def generate_parens(state, positions):
     """TODO: Docstring for generate_parens.
 
     :state: TODO
@@ -152,50 +148,28 @@ def generate_parens(state, open_pos, close_pos):
 
     """
     temp_states = []
-    left_open = list(open_pos)
-    left_closed = list(close_pos)  # noqa
-    positions = itertools.product(left_open, left_closed)
-    positions = list(filter(lambda p: p[0] < p[1], positions))
-    positions = [p for i in range(0, len(positions))
-                 for p in itertools.combinations(positions, i + 1)]
-    for ps in positions:
+    for p in parens:
         new_state = {}
-        (opens, closes) = zip(*ps)
-        if len(set(opens) & set(closes)) > 0:
-            continue
-        if(0 in opens and len(state['eval'])-1 in closes):
-            continue
-        parens = {}
-        for o in opens:
-            if o in parens:
-                parens[o]['count'] += 1
-            else:
-                parens[o] = {'val': '(', 'count': 1}
-        for o in closes:
-            if o in parens:
-                parens[o]['count'] += 1
-            else:
-                parens[o] = {'val': ')', 'count': 1}
         count = 0
         temp = state
-        for i in sorted(parens):
-            if parens[i]['val'] == '(':
+        for i in sorted(p):
+            if p[i]['val'] == '(':
                 new_state['eval'] = temp['eval'][0:i + count] + \
-                    ['('] * parens[i]['count'] + temp['eval'][i + count:]
+                    ['('] * p[i]['count'] + temp['eval'][i + count:]
                 new_state['repr'] = temp['repr'][0:i + count] + \
-                    ['('] * parens[i]['count'] + temp['repr'][i + count:]
+                    ['('] * p[i]['count'] + temp['repr'][i + count:]
             else:
                 if i + count == len(new_state['eval']):
-                    new_state['eval'] += [')'] * parens[i]['count']
-                    new_state['repr'] += [')'] * parens[i]['count']
+                    new_state['eval'] += [')'] * p[i]['count']
+                    new_state['repr'] += [')'] * p[i]['count']
                 else:
                     new_state['eval'] = temp['eval'][0:i + count + 1] + \
-                        [')'] * parens[i]['count'] + \
+                        [')'] * p[i]['count'] + \
                         temp['eval'][i + count + 1:]
                     new_state['repr'] = temp['repr'][0:i + count + 1] + \
-                        [')'] * parens[i]['count'] + \
+                        [')'] * p[i]['count'] + \
                         temp['repr'][i + count + 1:]
-            count += parens[i]['count']
+            count += p[i]['count']
             temp = new_state
         temp_states.append(new_state)
 
@@ -212,8 +186,32 @@ for i in range(1, max_length+1, 2):
     i_length_checked = set()
     i_length_states = []
     i_length_parens = []
-    open_pos = range(0, i, 2)
-    close_pos = range(2, i, 2)
+    open_pos = list(range(0, i, 2))
+    close_pos = list(range(2, i, 2))
+    positions = itertools.product(open_pos, close_pos)
+    positions = list(filter(lambda p: p[0] < p[1], positions))
+    positions = [p for i in range(0, len(positions))
+                 for p in itertools.combinations(positions, i + 1)]
+    parens = []
+    for ps in positions:
+        new_state = {}
+        (opens, closes) = zip(*ps)
+        if len(set(opens) & set(closes)) > 0:
+            continue
+        if(0 in opens and i-1 in closes):
+            continue
+        new_parens = {}
+        for o in opens:
+            if o in new_parens:
+                new_parens[o]['count'] += 1
+            else:
+                new_parens[o] = {'val': '(', 'count': 1}
+        for o in closes:
+            if o in new_parens:
+                new_parens[o]['count'] += 1
+            else:
+                new_parens[o] = {'val': ')', 'count': 1}
+        parens.append(new_parens)
     for n in range(len(nums)):
         temp_nums = nums
         temp_ops = ops
@@ -230,7 +228,7 @@ for i in range(1, max_length+1, 2):
             length += 2
         start_t = time.perf_counter()
         for s in states:
-            paren_states += generate_parens(s, open_pos, close_pos)
+            paren_states += generate_parens(s, parens)
         parens_time.append(time.perf_counter() - start_t)
         i_length_states += states
         i_length_parens += paren_states

@@ -22,24 +22,24 @@ int main(int argc, char** argv) {
 }
 
 bool unique(const char* new_value, const char** old_values, const int old_length) {
+    size_t len = strlen(new_value);
+    std::map<char,int> new_map;
+    for(size_t j = 0; j < len; ++j) {
+        if(new_value[j] != ')' && new_value[j] != '(') {
+            ++new_map[new_value[j]];
+        }
+    }
     for(size_t i = 0; i < old_length; ++i) {
         const char* old = old_values[i];
-        size_t len = strlen(old);
-        std::multiset<char> old_set;
+        len = strlen(old);
+        std::map<char,int> old_map;
         for(size_t j = 0; j < len; ++j) {
             if(old[j] != ')' && old[j] != '(') {
-                old_set.insert(old[j]);
-            }
-        }
-        len = strlen(new_value);
-        std::multiset<char> new_set;
-        for(size_t j = 0; j < len; ++j) {
-            if(new_value[j] != ')' && new_value[j] != '(') {
-                new_set.insert(new_value[j]);
+                ++old_map[old[j]];
             }
         }
 
-        if(new_set == old_set) {
+        if(new_map.size() == old_map.size() && new_map == old_map) {
             return false;
         }
     }
